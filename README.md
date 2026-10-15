@@ -38,7 +38,21 @@ New-Item -ItemType Directory -Force $HOME\.claude\agents
 Copy-Item claude-ekip\.claude\agents\*.md $HOME\.claude\agents\
 ```
 
-Claude Code açıksa `/agents` komutuyla agent'ların yüklendiğini görebilirsin. Aynı isimde iki agent varsa proje seviyesindeki (`.claude/agents/`) kullanıcı seviyesindekini (`~/.claude/agents/`) ezer.
+Gereksinim: [Claude Code](https://code.claude.com/docs) kurulu olmalı. Başka bir bağımlılık yok, sadece Markdown dosyaları.
+
+### Çalıştığını doğrula
+
+1. Claude Code'u projenin klasöründe başlat. Oturum zaten açıksa kapatıp yeniden aç, agent dosyaları başlangıçta okunur.
+2. `/agents` komutunu yaz. Listede `backend-dev`, `test-writer`, `code-reviewer` ve `debugger` görünmeli.
+3. Denemek için zararsız bir komut ver:
+
+```text
+code-reviewer agent'ını kullanarak bu projenin mevcut yapısını kısaca incele ve en önemli 3 gözlemini yaz.
+```
+
+Agent çalışırsa kurulum tamam. Çalışmazsa aşağıdaki [Sık karşılaşılan sorunlar](#sık-karşılaşılan-sorunlar) bölümüne bak.
+
+Aynı isimde iki agent varsa proje seviyesindeki (`.claude/agents/`) kullanıcı seviyesindekini (`~/.claude/agents/`) ezer.
 
 ## Ekip
 
@@ -76,6 +90,38 @@ veya @-mention ile:
 
 - **Bağımsız işler paralel çalışır.** Birbirini beklemeyen işleri aynı anda ver.
 - **Bağımlı işler zincirlenir.** Bir agent'ın çıktısı bir sonrakinin girdisiyse sırayla çalıştır: önce yaz, sonra test et, sonra incele.
+
+## Bir agent dosyası nasıl okunur?
+
+Her agent, tek bir Markdown dosyası. Üstteki `---` arasındaki kısım ayarlar (frontmatter), altındaki metin ise agent'a verilen talimat. Örnek olarak `code-reviewer.md`:
+
+```markdown
+---
+name: code-reviewer            # Agent'ın ismi. Çağırırken bunu kullanırsın.
+description: Kod inceleyici... # Ana Claude'un "bu işi kime vereyim?" kararını verdiği alan.
+tools: Read, Grep, Glob, Bash  # Agent'ın kullanabileceği araçlar. Listede olmayan araç kullanılamaz.
+model: sonnet                  # Hangi model çalışsın: sonnet, opus, haiku veya inherit.
+---
+
+Sen titiz ama yapıcı bir code reviewer'sın...   # Buradan sonrası agent'ın talimatı (system prompt).
+```
+
+Yukarıdaki `#` açıklamaları sadece öğretmek için eklendi; repodaki gerçek dosyalarda yok.
+
+| Alan | Zorunlu mu? | Ne işe yarar |
+|---|---|---|
+| `name` | Evet | Benzersiz isim |
+| `description` | Evet | Claude'un delegasyon kararını verdiği alan; ne zaman kullanılacağını yaz |
+| `tools` | Hayır | Verilmezse agent mevcut tüm araçları miras alır; bu yüzden bu repoda hep açıkça yazıldı |
+| `model` | Hayır | Verilmezse ana konuşmanın modeli kullanılır |
+
+## Kendine göre uyarla
+
+- **Dil veya stack ekle.** Agent'ın gövdesine kendi kurallarını yaz: "Bu projede TypeScript ve Express kullanıyoruz, testler Vitest ile yazılıyor" gibi. Ne kadar spesifik olursa o kadar iyi sonuç alırsın.
+- **Araçları daralt veya genişlet.** `tools:` satırını düzenle. Örneğin `test-writer` sadece mevcut testleri okusun istiyorsan `Edit, Write`'ı çıkar.
+- **Modeli değiştir.** Büyük bir refactor için `backend-dev`'e `model: opus` verebilirsin.
+- **Yeni agent ekle.** `.claude/agents/` altına yeni bir `.md` dosyası koy. Bir örnek: `docs-writer.md` (`tools: Read, Grep, Glob, Edit, Write`) README ve kod yorumlarını güncellesin.
+- **Türkçe veya İngilizce.** Agent gövdeleri Türkçe, ama agent'lar kullanıcının yazdığı dilde cevap verir. İstersen gövdeyi İngilizceye çevirebilirsin, çalışma şekli değişmez.
 
 ## Örnek prompt'lar
 
@@ -118,6 +164,23 @@ Hepsini tek prompt'ta da isteyebilirsin; bunun için zincirleme örneğine bak.
 - **Description'ı net yaz.** Ana Claude işi kime vereceğine buna bakarak karar verir. Belirsiz bir description yanlış agent'a, ya da hiç agent'a gitmemesine yol açar. "Use proactively" ifadesi otomatik delege etmeyi teşvik eder.
 - **Kendi agent'ını ekle.** `.claude/agents/` altına yeni bir `.md` dosyası koy, `name` ve `description` zorunlu alanlar.
 - **Description'ları kısa tut.** Çok sayıda agent'ın description'ı toplamda çok uzarsa Claude Code başlangıçta uyarı verir.
+
+## Sık karşılaşılan sorunlar
+
+**`/agents` listesinde agent'lar görünmüyor.**
+Dosyaların `.claude/agents/` altında olduğundan emin ol (proje kökünde, `claude-ekip` klasörünün içinde değil) ve Claude Code'u yeniden başlat. Dosya uzantısı `.md` olmalı.
+
+**Agent'ı çağırdım ama Claude kullanmadı.**
+İsmiyle açıkça iste: "code-reviewer agent'ını kullanarak ...". Otomatik delegasyon `description` alanına bağlı; işini kendi cümlenle anlatırsan Claude yine kendi başına yapmayı seçebilir.
+
+**Agent izin soruyor.**
+`Bash` ve `Edit` gibi araçlar, Claude Code'un normal izin kurallarına tabidir. Güvendiğin komutları izin ayarlarından önceden onaylayabilirsin.
+
+**Agent beklediğimden farklı stilde yazıyor.**
+Stilini gövdeye yaz ("fonksiyon isimleri camelCase", "hata mesajları Türkçe" gibi). Agent'lar projeyi okuyarak stile uyar, ama net kural her zaman daha iyi çalışır.
+
+**Aynı anda çok agent çalıştırınca limit çabuk bitiyor.**
+Her agent ayrı bir context ve ayrı token kullanımıdır. Paralel çalıştırmayı gerçekten bağımsız işlere sakla.
 
 ## İleri seviye: agent teams (deneysel)
 
